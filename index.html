@@ -1,71 +1,57 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Photo Enhancer</title>
-<style>
-body{font-family:sans-serif;max-width:600px;margin:auto;padding:12px;background:#111;color:#eee}
-canvas{width:100%;border-radius:8px;background:#222;margin-top:10px}
-label{display:block;margin-top:10px}
-input[type=range]{width:100%}
-button{padding:10px 14px;margin:8px 6px 0 0;border:0;border-radius:6px;background:#2ea043;color:#fff;font-size:15px}
-</style>
-</head>
-<body>
-<h1>Photo Enhancer</h1>
-<input type="file" id="file" accept="image/*">
-<canvas id="c"></canvas>
-
-<label>Brightness <input type="range" id="brightness" min="50" max="150" value="100"></label>
-<label>Contrast <input type="range" id="contrast" min="50" max="150" value="100"></label>
-<label>Saturation <input type="range" id="saturate" min="0" max="200" value="100"></label>
-<label>Grayscale <input type="range" id="grayscale" min="0" max="100" value="0"></label>
-<label>Sepia <input type="range" id="sepia" min="0" max="100" value="0"></label>
-<label>Blur <input type="range" id="blur" min="0" max="10" value="0"></label>
-
-<button id="x1">Original size</button>
-<button id="x2">Upscale 2x</button>
-<button id="k4">Upscale to 4K</button>
-<button id="save">Download</button>
-
-<script>
 const c = document.getElementById('c');
 const ctx = c.getContext('2d');
-let img = null, scale = 1, target4k = false;
+const save = document.getElementById('save');
+let img = null, mode = 'original';
 const ids = ['brightness','contrast','saturate','grayscale','sepia','blur'];
+const v = id => document.getElementById(id).value;
 
-function draw() {
+function filterStr() {
+  return `brightness(${v('brightness')}%) contrast(${v('contrast')}%) saturate(${v('saturate')}%) grayscale(${v('grayscale')}%) sepia(${v('sepia')}%) blur(${v('blur')}px)`;
+}
+
+function drawPreview() {
   if (!img) return;
-  const s = target4k ? 3840 / img.width : scale;
+  const s = Math.min(1, 900 / img.width);
   c.width = Math.round(img.width * s);
   c.height = Math.round(img.height * s);
-  const v = id => document.getElementById(id).value;
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  ctx.filter = `brightness(${v('brightness')}%) contrast(${v('contrast')}%) saturate(${v('saturate')}%) grayscale(${v('grayscale')}%) sepia(${v('sepia')}%) blur(${v('blur')}px)`;
+  ctx.filter = filterStr();
   ctx.drawImage(img, 0, 0, c.width, c.height);
+}
+
+function setMode(m, label) {
+  mode = m;
+  save.textContent = 'Download (' + label + ')';
 }
 
 document.getElementById('file').onchange = e => {
   const f = e.target.files[0];
   if (!f) return;
   img = new Image();
-  img.onload = draw;
+  img.onload = drawPreview;
   img.src = URL.createObjectURL(f);
 };
-ids.forEach(id => document.getElementById(id).oninput = draw);
-document.getElementById('x1').onclick = () => { scale = 1; target4k = false; draw(); };
-document.getElementById('x2').onclick = () => { scale = 2; target4k = false; draw(); };
-document.getElementById('k4').onclick = () => { target4k = true; draw(); };
-document.getElementById('save').onclick = () => {
-  c.toBlob(b => {
+ids.forEach(id => document.getElementById(id).oninput = drawPreview);
+document.getElementById('x1').onclick = () => setMode('original', 'original');
+document.getElementById('x2').onclick = () => setMode('2x', '2x');
+document.getElementById('k4').onclick = () => setMode('4k', '4K');
+
+save.onclick = () => {
+  if (!img) return;
+  let s = 1;
+  if (mode === '2x') s = 2;
+  if (mode === '4k') s = 3840 / img.width;
+  const out = document.createElement('canvas');
+  out.width = Math.round(img.width * s);
+  out.height = Math.round(img.height * s);
+  const o = out.getContext('2d');
+  o.imageSmoothingEnabled = true;
+  o.imageSmoothingQuality = 'high';
+  o.filter = filterStr();
+  o.drawImage(img, 0, 0, out.width, out.height);
+  out.toBlob(b => {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(b);
     a.download = 'enhanced.png';
     a.click();
   });
 };
-</script>
-</body>
-</html>
